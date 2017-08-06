@@ -14,11 +14,14 @@ class NodeConnector:
         self.out = 0
         
 class Node:
-    def __init__(self):
+    width = 120
+    
+    def __init__(self, icon:str):
         super(Node, self)
-        self.windowRect = QRectF(0,0,100,20)
+        self.windowRect = QRectF(0,0,Node.width,20)
         self.item = None
         self.inputs = [];
+        self.icon = QPixmap(icon);
 
     def setPos(self, pos:QPointF):
         self.item.setPos(pos)
@@ -76,6 +79,11 @@ class Node:
         ins=self.Inputs()
         ino=20+m-ic*10
         ouo=20+m-oc*10
+
+        pix=scene.addPixmap(self.icon)
+        pix.setPos((self.windowRect.width()-self.icon.width())*0.5,20+(self.windowRect.height()-20-self.icon.height())*0.5)
+        pix.setParentItem(self.item)
+        
         for i in range(0, ic):
             ti = scene.addText(ins[i])
             ti.setPos(0,i*20+ino)
@@ -90,7 +98,8 @@ class Node:
             ti = scene.addText(ins[i])
             ti.setPos(QPointF(self.windowRect.width()-ti.boundingRect().width(),i*20+ouo))
             ti.setParentItem(self.item)
-            ie = scene.addEllipse(QRectF(QPointF(self.windowRect.width()-5,i*20+5+ouo),QSizeF(10,10)));            ie.setParentItem(self.item)
+            ie = scene.addEllipse(QRectF(QPointF(self.windowRect.width()-5,i*20+5+ouo),QSizeF(10,10)));
+            ie.setParentItem(self.item)
             ie.setFlag(QGraphicsItem.ItemNegativeZStacksBehindParent)
             ie.setZValue(-1);
 
@@ -102,6 +111,9 @@ class Node:
 class Mul(Node):
     ilabel = ["A","B"]
     olabel = ["Result"]
+
+    def __init__(self):
+        super(Mul, self).__init__("../Icons/icons8-Mul.png")
     
     def GetTitle(self):
         return "Mul"
@@ -115,6 +127,9 @@ class Mul(Node):
 class Generate(Node):
     ilabel = ["Count","Type"]
     olabel = ["A","B","C"]
+
+    def __init__(self):
+        super(Generate, self).__init__("../Icons/icons8-Chip.png")
     
     def GetTitle(self):
         return "Generate"
@@ -128,6 +143,9 @@ class Generate(Node):
 class Many(Node):
     ilabel = ["In2","In3","In4","In5"]
     olabel = ["A","B","C","D"]
+
+    def __init__(self):
+        super(Many, self).__init__("../Icons/icons8-Integr.png")
     
     def GetTitle(self):
         return "Many"
