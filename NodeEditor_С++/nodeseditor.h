@@ -65,6 +65,9 @@ public:
     Node * GetNode(QPointF pos);
     Node * GetNode(QGraphicsItem *item);
 
+    bool LoadFromFile(QString path);
+    bool SaveToFile(QString path);
+
     static QMap<QString,void*> nodeCreator;
 
 protected:

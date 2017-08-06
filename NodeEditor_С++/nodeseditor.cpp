@@ -12,6 +12,7 @@
 #include <QGraphicsSceneMouseEvent>
 #include <QDebug>
 #include <QMimeData>
+#include <QDomDocument>
 
 QMap<QString,void*> NodesEditor::nodeCreator;
 
@@ -114,6 +115,76 @@ NodesEditor::Node * NodesEditor::GetNode(QGraphicsItem *item)
                 node = nodes[i];
     }
     return node;
+}
+
+bool NodesEditor::LoadFromFile(QString path)
+{
+    /*QFile file(path);
+    if (file.open(QIODevice::ReadOnly)) {
+        QDomDocument document;
+        if (document.setContent(&file)) {
+        }
+    }*/
+
+    return true;
+}
+
+bool NodesEditor::SaveToFile(QString path)
+{
+    QFile f(path);
+    if(f.open(QIODevice::WriteOnly))
+    {
+        QTextStream stream(&f);
+        stream.setCodec("UTF-8");
+        QDomDocument doc;
+        QDomNode xmlInstruct = doc.createProcessingInstruction (tr("xml"), "version=\"1\" encoding=\"UTF-8\"");
+        doc.appendChild(xmlInstruct);
+        QDomElement mainEl = doc.createElement("Nodes");
+        doc.appendChild(mainEl);
+
+        for(int i = 0; i < nodes.count(); i++)
+        {
+            QDomElement objectEl = doc.createElement("Node");
+            mainEl.appendChild(objectEl);
+
+            QDomElement idoEl = doc.createElement("Id");
+            objectEl.appendChild(idoEl);
+            QDomText idoEltext = doc.createTextNode(QString::number(i));
+            idoEl.appendChild(idoEltext);
+
+            QDomElement typeEl = doc.createElement("Type");
+            objectEl.appendChild(typeEl);
+            QDomText nameEltext = doc.createTextNode(nodes[i]->GetTitle());
+            typeEl.appendChild(nameEltext);
+
+            Node::NodeConnect * links=nodes[i]->inputs;
+            for (int j=0;j<nodes[i]->InputsCount();j++)
+                if (links[j].node)
+            {
+                QDomElement linkEl = doc.createElement("Link");
+                objectEl.appendChild(linkEl);
+
+                QDomElement idEl = doc.createElement("Id");
+                linkEl.appendChild(idEl);
+                QDomText idEltext = doc.createTextNode(QString::number(j));
+                idEl.appendChild(idEltext);
+
+                QDomElement nodeEl = doc.createElement("Node");
+                linkEl.appendChild(nodeEl);
+                QDomText idnEltext = doc.createTextNode(QString::number(nodes.indexOf(links[j].node)));
+                nodeEl.appendChild(idnEltext);
+
+                QDomElement outEl = doc.createElement("Out");
+                linkEl.appendChild(outEl);
+                QDomText outEltext = doc.createTextNode(QString::number(links[j].out));
+                outEl.appendChild(outEltext);
+            }
+        }
+        doc.save(stream, 4);//Второй параметр - это размер отсупа у строчек
+        f.close();
+        return true;
+    }
+    return false;
 }
 
 typedef NodesEditor::Node*  ( *nodeCreatorType)();

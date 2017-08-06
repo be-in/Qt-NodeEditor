@@ -36,5 +36,3 @@ HEADERS += \
     nodesexample.h \
     nodesmanager.h
 
-FORMS += \
-        mainwindow.ui

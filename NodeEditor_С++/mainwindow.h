@@ -6,6 +6,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include "nodeseditor.h"
 
 class MainWindow : public QMainWindow
 {
@@ -15,8 +16,18 @@ public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
 
+    bool LoadNodes(QString path);
+
+private slots:
+    void open();
+    void save();
+    void saveAs();
+    void quit();
+
 private:
-    //Ui::MainWindow *ui;
+    NodesEditor *ne;
+
+    QString filename;
 };
 
 #endif // MAINWINDOW_H
