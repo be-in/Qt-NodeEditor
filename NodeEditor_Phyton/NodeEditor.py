@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 
-from PyQt5.QtCore import (pyqtProperty, Qt, QRect, QRectF, QPointF, QSizeF, QEvent, QDataStream, QVariant)
+from PyQt5.QtCore import (pyqtProperty, Qt, QRect, QRectF, QPointF, QSizeF, QEvent, QDataStream, QVariant,
+                          QFile, QIODevice, QTextStream, QDir)
 from PyQt5.QtGui import (QColor, QPen, QBrush, QPainter, QPainterPath, QPixmap)
-from PyQt5.QtWidgets import (QApplication, QDockWidget, QMainWindow, QWidget,
+from PyQt5.QtWidgets import (QApplication, QDockWidget, QMainWindow, QWidget, QFileDialog, QDialog,
                              QGraphicsView, QGraphicsScene, QGraphicsItem, QGraphicsPathItem,
                              QSizePolicy, QTreeWidget, QAbstractItemView, QTreeWidgetItem)
+from PyQt5.QtXml import (QDomDocument, QDomElement, QDomText)
 
 class NodeConnector:
     def __init__(self):
@@ -107,7 +109,7 @@ class Node:
         for i in range (0,ic):
             self.inputs.append(NodeConnector())
             
-
+# user node
 class Mul(Node):
     ilabel = ["A","B"]
     olabel = ["Result"]
@@ -124,6 +126,7 @@ class Mul(Node):
     def Outputs(self):
         return Mul.olabel
 
+# user node
 class Generate(Node):
     ilabel = ["Count","Type"]
     olabel = ["A","B","C"]
@@ -140,6 +143,7 @@ class Generate(Node):
     def Outputs(self):
         return Generate.olabel
 
+# user node
 class Many(Node):
     ilabel = ["In2","In3","In4","In5"]
     olabel = ["A","B","C","D"]
@@ -167,6 +171,7 @@ class NodesManager(QDockWidget):
        self.nodesTree.setDragDropMode(QAbstractItemView.DragOnly);
        self.nodesTree.header().hide();
 
+# user nodes tree
        sub1 = QTreeWidgetItem(self.nodesTree)
        sub1.setText(0,"Some1")
        tMul=QTreeWidgetItem(sub1)
@@ -351,7 +356,7 @@ class NodesEditor(QDockWidget):
                 
                 value = QVariant()
                 ds >> value
-                item[Qt.ItemDataRole(key)]=value ##Qt.ItemDataRole(key)
+                item[Qt.ItemDataRole(key)]=value
              
             data.append(item)
         
@@ -404,7 +409,133 @@ class NodesEditor(QDockWidget):
         if self.connectItem is not None :
             self.nodesScene.removeItem(self.connectItem)
             self.connectItem = None
-            
+
+    def indexOfNode(self,node):
+        for i in range(0,len(self.nodes)):
+            if self.nodes[i] == node:
+                return i
+        return -1
+
+    def SeveToFile(self, path):
+        #print(path)
+        f = QFile(path)
+        if f.open(QIODevice.WriteOnly):
+            stream = QTextStream(f)
+            stream.setCodec("UTF-8")
+            doc = QDomDocument()
+            xmlInstruct = doc.createProcessingInstruction ("xml", "version=\"1\" encoding=\"UTF-8\"")
+            doc.appendChild(xmlInstruct)
+            mainEl = doc.createElement("Nodes")
+            doc.appendChild(mainEl)
+
+            for i in range(0,len(self.nodes)):
+                objectEl = doc.createElement("Node")
+                mainEl.appendChild(objectEl)
+
+                idoEl = doc.createElement("Id")
+                objectEl.appendChild(idoEl)
+                idoEltext = doc.createTextNode(str(i))
+                idoEl.appendChild(idoEltext)
+
+                typeEl = doc.createElement("Type")
+                objectEl.appendChild(typeEl)
+                nameEltext = doc.createTextNode(type(self.nodes[i]).__name__)
+                typeEl.appendChild(nameEltext)
+
+                posEl = doc.createElement("Pos")
+                objectEl.appendChild(posEl)
+                pos = self.nodes[i].item.scenePos()
+                posEltext = doc.createTextNode(str(pos.x()) + "," + str(pos.y()))
+                posEl.appendChild(posEltext)
+
+                liksEl = doc.createElement("Links")
+                objectEl.appendChild(liksEl)
+                inputs = self.nodes[i].inputs;
+                for j in range(0,len(inputs)):
+                    if inputs[j].node is not None:
+                        linkEl = doc.createElement("Link")
+                        liksEl.appendChild(linkEl)
+
+                        idEl = doc.createElement("Id")
+                        linkEl.appendChild(idEl)
+                        idEltext = doc.createTextNode(str(j))
+                        idEl.appendChild(idEltext)
+
+                        nodeEl = doc.createElement("Node")
+                        linkEl.appendChild(nodeEl)
+                        idnEltext = doc.createTextNode(str(self.indexOfNode(inputs[j].node)))
+                        nodeEl.appendChild(idnEltext)
+
+                        outEl = doc.createElement("Out")
+                        linkEl.appendChild(outEl)
+                        outEltext = doc.createTextNode(str(inputs[j].out))
+                        outEl.appendChild(outEltext)
+
+            doc.save(stream, 4)
+            f.close()
+            return True
+        return False
+
+    def LoadFromFile(self, path):
+        #print(path)
+        self.nodes=[]
+        self.nodesScene.clear()
+        file = QFile(path)
+        if not file.open(QIODevice.ReadOnly):
+            return False
+
+        doc = QDomDocument()
+        if not doc.setContent(file):
+            file.close()
+            return False
+        file.close()
+
+        docElem = doc.documentElement()
+        n = docElem.firstChild()
+        while not n.isNull():
+            en = n.toElement()
+            #print(en.tagName())
+            if en.tagName() == "Node":
+                np = n.firstChild()
+                typeN = ""
+                pos = QPointF(0,0)
+                links = None
+                while not np.isNull():
+                    enp = np.toElement()
+                    if enp.tagName() == "Type":
+                        typeN = enp.text()
+                    if enp.tagName() == "Pos":
+                        post = enp.text().split(",")
+                        pos = QPointF(float(post[0]),float(post[1]))
+                    if enp.tagName() == "Links":
+                        links = np;
+                    np = np.nextSibling()
+                if typeN in NodesEditor.nodeCreator:
+                    node = NodesEditor.nodeCreator[typeN]()
+                    self.addNode(node).setPos(pos)
+                    if links is not None:
+                        nl = links.firstChild()
+                        while not nl.isNull():
+                            npl = nl.firstChild()
+                            idl = -1
+                            idn = -1
+                            out = -1
+                            while not npl.isNull():
+                                enpl = npl.toElement()
+                                if enpl.tagName() == "Id":
+                                    idl = int(enp.text());
+                                if enpl.tagName() == "Node":
+                                    idn = int(enp.text());
+                                if enpl.tagName() == "Out":
+                                    out = int(enp.text());
+                                npl = npl.nextSibling()
+                            if idl>=0:
+                                node.inputs[idl].node = self.nodes[idn]
+                                node.inputs[idl].out = out
+                            nl = nl.nextSibling()
+            n = n.nextSibling()
+        self.updateConnectors()
+        return True
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -413,9 +544,26 @@ class MainWindow(QMainWindow):
         self.nm = NodesManager("NodesManager",self)
         self.ne = NodesEditor("NodesEditor",self)
 
-        self.addDockWidget(Qt.TopDockWidgetArea, self.nm);
-        self.addDockWidget(Qt.TopDockWidgetArea, self.ne);
+        self.addDockWidget(Qt.TopDockWidgetArea, self.nm)
+        self.addDockWidget(Qt.TopDockWidgetArea, self.ne)
 
+        self.fileName = ""
+
+        fileMenu = self.menuBar().addMenu("&File")
+        openAction = fileMenu.addAction("&Open")
+        openAction.setShortcut("Ctrl+O")
+        saveAction = fileMenu.addAction("&Save")
+        saveAction.setShortcut("Ctrl+S")
+        saveAsAction = fileMenu.addAction("&Save as ..")
+        exitAction = fileMenu.addAction("E&xit")
+        exitAction.setShortcut("Ctrl+Q")
+        
+        openAction.triggered.connect(self.openNodes)
+        saveAction.triggered.connect(self.saveNodes)
+        saveAsAction.triggered.connect(self.saveAsNodes)
+        exitAction.triggered.connect(self.quitApp)
+
+#register user node
         NodesEditor.nodeCreator["Mul"]=Mul
         NodesEditor.nodeCreator["Generate"]=Generate
         NodesEditor.nodeCreator["Many"]=Many
@@ -423,7 +571,42 @@ class MainWindow(QMainWindow):
     def RegisterNode(path,name,cname):
         NodesEditor.nodeCreator[name]=cname
         #self.nm.addPath(path);
-    
+
+    def openNodes(self):
+        #print("openNodes")
+        format = 'nod'
+        initialPath = self.fileName
+        if initialPath == "":
+            initialPath = QDir.currentPath() + "/untitled." + format
+
+        initialPath, _ = QFileDialog.getOpenFileName(self, "Save As", initialPath,"%s Files (*.%s);;All Files (*)" % (format.upper(), format))
+        if initialPath:
+            self.fileName = initialPath
+            self.ne.LoadFromFile(initialPath)
+
+    def saveNodes(self):
+        #print("saveNodes")
+        if self.fileName == "":
+            self.saveAsNodes()
+        else:
+            self.ne.SeveToFile(self.fileName)
+
+    def saveAsNodes(self):
+        #print("saveAsNodes")
+        format = 'nod'
+        initialPath = self.fileName
+        if initialPath == "":
+            initialPath = QDir.currentPath() + "/untitled." + format
+
+        initialPath, _ = QFileDialog.getSaveFileName(self, "Save As", initialPath,"%s Files (*.%s);;All Files (*)" % (format.upper(), format))
+        if initialPath:
+            self.fileName = initialPath
+            self.ne.SeveToFile(initialPath)
+        
+    def quitApp(self):
+        #print("quitApp")
+        #close()
+        QApplication.instance().quit()
 
 if __name__ == '__main__':
 
